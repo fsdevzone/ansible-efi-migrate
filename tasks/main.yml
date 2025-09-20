@@ -1,0 +1,58 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for efi_migrate
+
+- name: Migrate to EFI
+  become: true
+  block:
+    - name: Check EFI
+      register: efi_migrate_firmware
+      ansible.builtin.stat:
+        path: /sys/firmware/efi
+
+    - name: Check Readiness
+      ansible.builtin.assert:
+        that:
+          - not efi_migrate_firmware.stat.exists
+          - (ansible_mounts | selectattr('mount', 'match', '^/boot/efi$') | length) == 1
+          - (ansible_mounts | selectattr('mount', 'match', '^/boot$') | length) == 1
+
+    - name: Get EFI Boot
+      vars:
+        efi_mountpoint: "{{ ansible_mounts | selectattr('mount', 'match', '^/boot/efi$') | list | first }}"
+        efi_part_name: "{{ efi_mountpoint.device | basename }}"
+        efi_device: "{{ ansible_devices | dict2items | selectattr('value.partitions', 'contains', efi_part_name) | first }}"
+      ansible.builtin.set_fact:
+        efi_migrate_boot_device: "{{ efi_device.value }}"
+        efi_migrate_boot_disk: "/dev/{{ efi_device.key }}"
+        efi_migrate_boot_disk_part_id: "{{ efi_part_name[-1] }}"
+        efi_migrate_boot_partition: "{{ efi_part_name }}"
+        efi_migrate_boot_mount: "{{ efi_mountpoint }}"
+
+    - name: Get BIOS Boot Info
+      vars:
+        bios_mountpoint: "{{ ansible_mounts | selectattr('mount', 'match', '^/boot$') | list | first }}"
+        bios_part_name: "{{ bios_mountpoint.device | basename }}"
+        bios_device: "{{ ansible_devices | dict2items | selectattr('value.partitions', 'contains', bios_part_name) | first }}"
+      ansible.builtin.set_fact:
+        efi_migrate_bios_device: "{{ bios_device.value }}"
+        efi_migrate_bios_disk: "/dev/{{ bios_device.key }}"
+        efi_migrate_bios_disk_part_id: "{{ bios_part_name[-1] }}"
+        efi_migrate_bios_mount: "{{ bios_mountpoint }}"
+        efi_migrate_bios_partition: "{{ bios_part_name }}"
+
+    - name: Read device information
+      register: efi_migrate_disk_info
+      community.general.parted:
+        device: "{{ efi_migrate_boot_disk }}"
+        unit: MiB
+
+    - name: Change Disk to GPT Table
+      when: efi_migrate_disk_info.disk.table != "gpt"
+      ansible.builtin.include_tasks: gpt.yml
+
+    - name: Change to EFI Boot
+      ansible.builtin.include_tasks: efi.yml
+
+    - name: Cleanup
+      ansible.builtin.include_tasks: cleanup.yml

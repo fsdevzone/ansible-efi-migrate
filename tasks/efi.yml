@@ -1,0 +1,42 @@
+---
+
+- name: Pakete installieren
+  ansible.builtin.dnf:
+    name:
+      - gdisk
+      - grub2-efi-x64-modules
+      - efibootmgr
+      - grub2-tools-efi
+      - shim-*
+      - grub2-efi-*
+      - grub2-common
+
+- name: Set Partition Flags
+  loop:
+    - part: "{{ efi_migration_bios_disk_part_id }}"
+      state: 'off'
+    - part: "{{ efi_migration_boot_disk_part_id }}"
+      state: 'on'
+  loop_control:
+    label: "{{ item.part }} boot {{ item.state }}"
+  ansible.builtin.shell: # noqa: command-instead-of-shell no-changed-when
+    cmd: '/sbin/parted -a optimal {{ efi_migration_boot_disk }} ---pretend-input-tty set {{ item.part }} boot {{ item.state }}'
+
+- name: Install EFI Bootloader # noqa: command-instead-of-shell no-changed-when
+  ansible.builtin.shell:
+    cmd: dnf reinstall -y shim-* grub2-efi-* grub2-common
+
+- name: Config BIOS Bootloader # noqa: command-instead-of-shell no-changed-when
+  ansible.builtin.shell:
+    cmd: grub2-mkconfig -o /boot/grub2/grub.cfg
+
+- name: Config EFI Bootloader # noqa: command-instead-of-shell no-changed-when
+  ansible.builtin.shell:
+    cmd: grub2-mkconfig -o /boot/efi/EFI/redhat/grub.cfg
+
+- name: Shutdown Server
+  community.general.shutdown:
+
+- name: Change Bios Settings
+  ansible.builtin.pause:
+    prompt: "Please Boot the Server and Change its Bootloader to EFI. Press ENTER to Continue"

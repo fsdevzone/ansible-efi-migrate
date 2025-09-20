@@ -1,0 +1,83 @@
+---
+
+- name: Unmont EFI & Boot
+  loop:
+    - /boot/efi
+    - /boot
+  ansible.posix.mount:
+    path: "{{ item }}"
+    state: unmounted
+
+- name: Resize EFI Part
+  vars:
+    part_num: "{{ efi_migration_boot_partition[-1] }}"
+    part: "{{ efi_migration_disk_info.partitions | selectattr('num', 'equalto', (part_num | int)) | first }}"
+  ansible.builtin.shell: # noqa: command-instead-of-shell no-changed-when
+    cmd: |
+      set -o pipefail
+      echo Yes | /sbin/parted -a optimal {{ efi_migration_boot_disk }} ---pretend-input-tty resizepart {{ part.num }} {{ part.end | int - 3 }}MiB
+
+- name: Change Partition Table to GPT
+  ansible.builtin.shell: # noqa: command-instead-of-shell no-changed-when
+    cmd: gdisk {{ efi_migration_boot_disk }}
+    stdin: |
+      w
+      y
+
+- name: Read device information
+  register: efi_migration_disk_s_info
+  community.general.parted:
+    device: "{{ efi_migration_boot_disk }}"
+    unit: s
+
+# You'll need this in order to boot in BIOS mode from a GPT disk
+- name: Create Compat Partition
+  when: "(efi_migration_disk_s_info.partitions | length) != 4"
+  block:
+    - name: Create Compat Partition
+      vars:
+        parted_cmd: "mkpart bios {{ ((efi_migration_disk_s_info.partitions | last).end | int) + 1 }}s -1"
+      ansible.builtin.shell: # noqa: command-instead-of-shell no-changed-when
+        cmd: |
+          set -o pipefail
+          echo Yes | /sbin/parted -a optimal {{ efi_migration_boot_disk }} -- {{ parted_cmd }}
+
+    - name: Set Partition Flags
+      loop:
+        - part: "{{ (efi_migration_disk_info.partitions | length) + 1 }}"
+          flag: bios_grub
+          state: 'on'
+        - part: "{{ efi_migration_bios_disk_part_id }}"
+          state: 'on'
+        - part: "{{ efi_migration_boot_disk_part_id }}"
+          state: 'off'
+      ansible.builtin.shell: # noqa: command-instead-of-shell no-changed-when
+        cmd: '/sbin/parted -a optimal {{ efi_migration_boot_disk }} ---pretend-input-tty set {{ item.part }} {{ item.flag | default("boot") }} {{ item.state }}'
+
+- name: Mount BIOS and EFI again
+  loop:
+    - "{{ efi_migration_bios_mount }}"
+    - "{{ efi_migration_boot_mount }}"
+  loop_control:
+    label: "{{ item.mount }}"
+  ansible.posix.mount:
+    path: "{{ item.mount }}"
+    fstype: "{{ item.fstype }}"
+    src: "UUID={{ item.uuid }}"
+    opts: "{{ item.options }}"
+    state: mounted
+
+- name: Install BIOS Bootloader # noqa: command-instead-of-shell no-changed-when
+  ansible.builtin.shell:
+    cmd: grub2-install {{ efi_migration_boot_disk }}
+
+- name: Config BIOS Bootloader # noqa: command-instead-of-shell no-changed-when
+  ansible.builtin.shell:
+    cmd: grub2-mkconfig -o /boot/grub2/grub.cfg
+
+- name: Reboot Server
+  ansible.builtin.reboot:
+    reboot_timeout: "{{ efi_migrate_reboot_timeout }}"
+    msg: "{{ efi_migrate_reboot_msg }}"
+    pre_reboot_delay: 10
+    post_reboot_delay: 10

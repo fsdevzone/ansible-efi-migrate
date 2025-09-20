@@ -1,0 +1,59 @@
+---
+
+- name: Read device information
+  register: efi_migration_disk_info
+  community.general.parted:
+    device: "{{ efi_migration_boot_disk }}"
+    unit: MiB
+
+- name: Remove Bios Compat Part
+  when: (efi_migration_disk_info.partitions | selectattr('flags', 'contains', 'bios_grub') | length) == 1
+  block:
+    - name: Unmont EFI & Boot
+      loop:
+        - /boot/efi
+        - /boot
+      ansible.posix.mount:
+        path: "{{ item }}"
+        state: unmounted
+
+    - name: Remove Bios Compat Part
+      when: (efi_migration_disk_info.partitions | selectattr('flags', 'contains', 'bios_grub') | length) == 1
+      vars:
+        part: "{{ efi_migration_disk_info.partitions | selectattr('flags', 'contains', 'bios_grub') | first }}"
+      community.general.parted:
+        device: "{{ efi_migration_boot_disk }}"
+        number: "{{ part.num }}"
+        state: absent
+
+    - name: Read device information
+      register: efi_migration_disk_info_new
+      community.general.parted:
+        device: "{{ efi_migration_boot_disk }}"
+        unit: MiB
+
+    - name: Extend last partition to fill all available space
+      vars:
+        part: "{{ efi_migration_disk_info_new.partitions[-1] }}"
+      community.general.parted:
+        device: "{{ efi_migration_boot_disk }}"
+        label: "{{ efi_migration_disk_info_new.disk.table }}"
+        number: "{{ part.num }}"
+        fs_type: "{{ part.fstype }}"
+        part_start: "{{ part.begin | int }}MiB"
+        part_end: "100%"
+        resize: true
+        state: present
+
+    - name: Mount BIOS & EFI again after cleanup
+      loop:
+        - "{{ efi_migration_bios_mount }}"
+        - "{{ efi_migration_boot_mount }}"
+      loop_control:
+        label: "{{ item.mount }}"
+      ansible.posix.mount:
+        path: "{{ item.mount }}"
+        fstype: "{{ item.fstype }}"
+        src: "UUID={{ item.uuid }}"
+        opts: "{{ item.options }}"
+        state: mounted

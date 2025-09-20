@@ -1,0 +1,5 @@
+#SPDX-License-Identifier: MIT-0
+---
+# vars file for efi_migrate
+efi_migrate_reboot_msg: "{{ efi_migration_boot_disk }} changed to GPT"
+efi_migrate_reboot_timeout: 120
