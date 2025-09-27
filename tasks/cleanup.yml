@@ -11,10 +11,12 @@
   block:
     - name: Unmont EFI & Boot
       loop:
-        - /boot/efi
-        - /boot
+        - "{{ efi_migration_bios_mount }}"
+        - "{{ efi_migration_boot_mount }}"
+      loop_control:
+        label: "{{ item.mount }}"
       ansible.posix.mount:
-        path: "{{ item }}"
+        path: "{{ item.mount }}"
         state: unmounted
 
     - name: Remove Bios Compat Part

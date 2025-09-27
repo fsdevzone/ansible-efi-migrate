@@ -1,7 +1,14 @@
 #SPDX-License-Identifier: MIT-0
 galaxy_info:
   author: Fabian Seelbach
-  description: your role description
+  description: |
+    This Role can change a Server from BIOS to EFI Boot.  
+    I tested it with RHEL 8 and works so far.  
+    Please note: this is neither supported by RedHat or by myself !! USE WITH CAUTION !! I recommend making Snapshots beforehand!
+
+    The role will check if the system is running in BIOS mode and if there are mount points for /boot and /boot/efi.
+    It will then check if the disk containing /boot/efi is using a GPT partition table and if not, it will convert the disk to GPT and create a BIOS compatibility partition if needed.
+    Finally, it will install the EFI bootloader and migrate the system to EFI boot mode.
   company: Mediendesign Fabian Seelbach
 
   # If the issue tracker for your role is not on github, uncomment the
@@ -29,7 +36,25 @@ galaxy_info:
     #
     # NOTE: A tag is limited to a single word comprised of alphanumeric characters.
     #       Maximum 20 tags per role.
+  platforms:
+    - name: EL
+      versions:
+        - 8
+    # - name: Ubuntu
+    #   versions:
+    #     - bionic
+    #     - focal
+    #     - jammy
+    # - name: Debian
+    #   versions:
+    #     - buster
+    #     - bullseye
+    #     - bookworm
+    # - name: Fedora
+    #   versions:
+    #     - all
 
 dependencies: []
   # List your role dependencies here, one per line. Be sure to remove the '[]' above,
   # if you add dependencies to this list.
+

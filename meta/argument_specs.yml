@@ -1,0 +1,86 @@
+---
+
+argument_specs:
+  main:
+    short_description: Main Entry Point
+    description: This is the main entry point for the role.
+    version_added: "1.0.0"
+    author: Fabian Seelbach
+    options: {}
+  cleanup:
+    short_description: Cleanup after EFI Migration
+    description: This task file cleans up the disk partitions after migrating from BIOS to EFI.
+    version_added: "1.0.0"
+    options:
+      efi_migration_boot_disk:
+        type: str
+        description: The boot disk where the EFI migration took place.
+        required: true
+      efi_migration_bios_mount:
+        type: dict
+        description: The mount point of the BIOS boot partition. - Part from ansible_mounts
+        required: true
+      efi_migration_boot_mount:
+        type: dict
+        description: The mount point of the EFI boot partition. - Part from ansible_mounts
+        required: true
+    efi:
+    short_description: Migrate to EFI Bootloader
+    description: This task file handles the migration from BIOS to EFI bootloader.
+    version_added: "1.0.0"
+    options:
+      efi_migration_bios_disk_part_id:
+        type: str
+        description: The partition ID of the BIOS boot partition.
+        required: true
+      efi_migration_boot_disk_part_id:
+        type: str
+        description: The partition ID of the EFI boot partition.
+        required: true
+      efi_migration_boot_disk:
+        type: str
+        description: The boot disk where the EFI migration will take place.
+        required: true
+    gpt:
+      short_description: Convert Disk to GPT
+      description: This task file converts the disk partition table to GPT and creates a BIOS compatibility partition if needed.
+      version_added: "1.0.0"
+      options:
+        efi_migration_boot_partition:
+          type: str
+          description: The partition name of the EFI boot partition.
+          required: true
+        efi_migration_boot_disk_info:
+          type: dict
+          description: The disk information of the boot disk. - Registered from parted module.
+          required: true
+        efi_migration_boot_disk:
+          type: str
+          description: The boot disk where the EFI migration will take place.
+          required: true
+        efi_migration_bios_disk_part_id:
+          type: str
+          description: The partition ID of the BIOS boot partition.
+          required: true
+        efi_migration_boot_disk_part_id:
+          type: str
+          description: The partition ID of the EFI boot partition.
+          required: true
+        efi_migration_bios_mount:
+          type: dict
+          description: The mount point of the BIOS boot partition. - Part from ansible_mounts
+          required: true
+        efi_migration_boot_mount:
+          type: dict
+          description: The mount point of the EFI boot partition. - Part from ansible_mounts
+          required: true
+        efi_migrate_reboot_msg:
+          type: str
+          description: The message to display when a reboot is required after migration.
+          required: false
+          default: "{{ efi_migration_boot_disk }} changed to GPT"
+        efi_migrate_reboot_timeout:
+          type: int
+          description: The timeout in seconds for the reboot after migration.
+          required: false
+          default: 120
