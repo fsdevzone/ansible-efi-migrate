@@ -10,8 +10,8 @@ Description: This Role can change a Server from BIOS to EFI Boot.
 I tested it with RHEL 8 and works so far.  
 Please note: this is neither supported by RedHat or by myself !! USE WITH CAUTION !! I recommend making Snapshots beforehand!
 
-The role will check if the system is running in BIOS mode and if there are mount points for /boot and /boot/efi.
-It will then check if the disk containing /boot/efi is using a GPT partition table and if not, it will convert the disk to GPT and create a BIOS compatibility partition if needed.
+The role will check if the system is running in BIOS mode and if there are mount points for /boot and /boot/efi.  
+It will then check if the disk containing /boot/efi is using a GPT partition table and if not, it will convert the disk to GPT and create a BIOS compatibility partition if needed.  
 Finally, it will install the EFI bootloader and migrate the system to EFI boot mode.
 
 
