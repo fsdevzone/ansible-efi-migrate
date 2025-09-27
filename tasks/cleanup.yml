@@ -59,3 +59,31 @@
         src: "UUID={{ item.uuid }}"
         opts: "{{ item.options }}"
         state: mounted
+
+- name: Find False Boot-Config
+  register: efi_migrate_efi_config
+  ansible.builtin.find:
+    paths: "/boot/grub2"
+    file_type: file
+    patterns:
+      - grub.cf*
+      - gruben*
+
+- name: Found False Configs
+  when: efi_migrate_efi_config.matched != 0
+  block:
+    - name: Remove False Configs
+      loop: "{{ efi_migrate_efi_config.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      ansible.builtin.file:
+        state: absent
+        dest: "{{ item.path }}"
+
+    - name: Reinstall EFI
+      ansible.builtin.command: dnf -y reinstall grub2-efi-x64
+      changed_when: true
+
+    - name: Rebuild Grub Config
+      ansible.builtin.command: grub2-mkconfig
+      changed_when: true
